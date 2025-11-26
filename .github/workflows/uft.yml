@@ -40,7 +40,7 @@ jobs:
         run: |
           @"
           runType=FileSystem
-          testsFolder=.\\Script\\Demo
+          Test1=.\\Script\\Demo
           resultsFilename=.\\Reports\\$($env:RES_XML)
           fsReportPath=.\\Reports
           "@ | Out-File -FilePath $env:PROPS_TXT -Encoding utf8
