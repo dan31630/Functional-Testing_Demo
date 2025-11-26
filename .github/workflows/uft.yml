@@ -1,0 +1,84 @@
+name: Run UFT One Tests Action
+
+# 什麼時候觸發：這裡先用手動觸發（UI / API）
+on:
+  workflow_dispatch:
+
+# 環境變數（檔名 & 下載 URL）
+env:
+  PROPS_TXT: PropsMultiTests.txt
+  RES_XML: ResultsMultiTests.xml
+  LAUNCHER_EXE: FTToolsLauncher.exe
+  LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
+
+# 預設用 PowerShell 7，工作目錄為「repo 根目錄」
+defaults:
+  run:
+    shell: pwsh
+    working-directory: .\
+
+jobs:
+  # 1️⃣ 取得目前 repo（checkout 到 runner 上）
+  getUftTests:
+    runs-on: self-hosted
+    steps:
+      - name: Display the working directory
+        run: echo "$pwd"
+
+      - name: Checkout current repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref_name }}
+          clean: false
+
+  # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
+  createPropsFile:
+    runs-on: self-hosted
+    needs: getUftTests
+    steps:
+      - name: Create properties file
+        run: |
+          @"
+          runType=FileSystem
+          testsFolder=.\Script\Demo
+          resultsFile=.\Reports\${env:RES_XML}
+          fsReportPath=.\Reports
+          "@ | Out-File -FilePath $env:PROPS_TXT -Encoding utf8
+
+      - name: Check properties file
+        run: Test-Path $env:PROPS_TXT
+
+  # 3️⃣ 準備 FTToolsLauncher.exe（若本機沒有就下載）
+  getFTToolsLauncher:
+    runs-on: self-hosted
+    needs: getUftTests
+    steps:
+      - name: GET FTToolsLauncher.exe
+        run: |
+          if (Test-Path $env:LAUNCHER_EXE) {
+            echo "FTToolsLauncher.exe already exists"
+          }
+          else {
+            curl -L -o $env:LAUNCHER_EXE $env:LAUNCHER_URL
+          }
+
+  # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試
+  runUftTestsFromFileSystem:
+    runs-on: self-hosted
+    needs: [getUftTests, createPropsFile, getFTToolsLauncher]
+    steps:
+      - name: Run FT tool
+        id: run-tests
+        run: |
+          $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
+                             -ArgumentList "-paramfile $env:PROPS_TXT" `
+                             -Wait -PassThru -NoNewWindow
+          "X=$($p.ExitCode)" >> $env:GITHUB_OUTPUT
+
+      - name: Fail the workflow if tests failed
+        if: ${{ steps.run-tests.outputs.X != 0 }}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setFailed("The job runUftTestsFromFileSystem failed with status ${{ steps.run-tests.outputs.X }} !")
+
