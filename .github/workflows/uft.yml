@@ -32,6 +32,7 @@ jobs:
           clean: false
 
   # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
+  # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
   createPropsFile:
     runs-on: self-hosted
     needs: getUftTests
@@ -40,13 +41,14 @@ jobs:
         run: |
           @"
           runType=FileSystem
-          testsFolder=.\Script\Demo
-          resultsFile=.\Reports\${env:RES_XML}
-          fsReportPath=.\Reports
+          testsFolder=.\\Script\\Demo
+          resultsFilename=.\\Reports\\$($env:RES_XML)
+          fsReportPath=.\\Reports
           "@ | Out-File -FilePath $env:PROPS_TXT -Encoding utf8
 
       - name: Check properties file
         run: Test-Path $env:PROPS_TXT
+
 
   # 3️⃣ 準備 FTToolsLauncher.exe（若本機沒有就下載）
   getFTToolsLauncher:
