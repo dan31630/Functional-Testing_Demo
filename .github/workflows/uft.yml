@@ -56,11 +56,13 @@ jobs:
       - name: GET FTToolsLauncher.exe
         run: |
           if (Test-Path $env:LAUNCHER_EXE) {
-            echo "FTToolsLauncher.exe already exists"
+            Write-Host "FTToolsLauncher.exe already exists"
           }
           else {
-            curl -L -o $env:LAUNCHER_EXE $env:LAUNCHER_URL
+            Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
+            Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
           }
+
 
   # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試
   runUftTestsFromFileSystem:
