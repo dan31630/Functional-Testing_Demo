@@ -66,23 +66,46 @@ jobs:
           }
 
 
-  # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試
+  # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試，並根據結果決定 Action 成功或失敗
   runUftTestsFromFileSystem:
     runs-on: self-hosted
     needs: [getUftTests, createPropsFile, getFTToolsLauncher]
     steps:
-      - name: Run FT tool
-        id: run-tests
+      - name: Run FT tool and evaluate result
         run: |
+          # 1. 執行 FTToolsLauncher
           $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
                              -ArgumentList "-paramfile $env:PROPS_TXT" `
                              -Wait -PassThru -NoNewWindow
-          "X=$($p.ExitCode)" >> $env:GITHUB_OUTPUT
 
-      - name: Fail the workflow if tests failed
-        if: ${{ steps.run-tests.outputs.X != 0 }}
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.setFailed("The job runUftTestsFromFileSystem failed with status ${{ steps.run-tests.outputs.X }} !")
+          $code = $p.ExitCode
+          Write-Host "Launcher exit code: $code"
+
+          # 2. 如果 Launcher 本身就失敗，直接讓 GitHub Action 失敗
+          if ($code -ne 0) {
+            Write-Error "FTToolsLauncher failed with exit code $code"
+            exit $code
+          }
+
+          # 3. 檢查結果檔是否存在
+          $resultsPath = ".\Reports\$env:RES_XML"
+          if (!(Test-Path $resultsPath)) {
+            Write-Error "Results file not found: $resultsPath"
+            exit 1
+          }
+
+          Write-Host "Results file found at $resultsPath"
+
+          # 4. 讀取結果 XML，判斷是否有 Failed
+          [xml]$results = Get-Content $resultsPath
+
+          # 這裡用很保守的方式：只要 XML 內容出現 'Failed' 字樣，就當作有失敗
+          $xmlText = $results.OuterXml
+          if ($xmlText -match 'Failed') {
+            Write-Error "One or more UFT tests FAILED (found 'Failed' in results XML)."
+            exit 1
+          }
+
+          Write-Host "All UFT tests PASSED (no 'Failed' found in results XML)."
+
 
