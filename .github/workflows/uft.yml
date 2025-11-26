@@ -40,9 +40,9 @@ jobs:
         run: |
           @"
           runType=FileSystem
-          Test1=.\\Script\\Demo
-          resultsFilename=.\\Reports\\$($env:RES_XML)
-          fsReportPath=.\\Reports
+          Test1=C:\\UFT_Tests\\Script\\Demo
+          resultsFilename=C:\\UFT_Tests\\Reports\\$($env:RES_XML)
+          fsReportPath=C:\\UFT_Tests\\Reports
           "@ | Out-File -FilePath $env:PROPS_TXT -Encoding utf8
 
       - name: Check properties file
@@ -85,7 +85,7 @@ jobs:
           }
 
           # 3. 檢查結果檔是否存在
-          $resultsPath = ".\Reports\$env:RES_XML"
+          $resultsPath = "C:\UFT_Tests\Reports\$env:RES_XML"
           if (!(Test-Path $resultsPath)) {
             Write-Error "Results file not found: $resultsPath"
             exit 1
