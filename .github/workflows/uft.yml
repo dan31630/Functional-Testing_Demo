@@ -32,7 +32,6 @@ jobs:
           clean: false
 
   # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
-  # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
   createPropsFile:
     runs-on: self-hosted
     needs: getUftTests
@@ -49,7 +48,6 @@ jobs:
       - name: Check properties file
         run: Test-Path $env:PROPS_TXT
 
-
   # 3️⃣ 準備 FTToolsLauncher.exe（若本機沒有就下載）
   getFTToolsLauncher:
     runs-on: self-hosted
@@ -64,7 +62,6 @@ jobs:
             Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
             Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
           }
-
 
   # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試，並根據結果決定 Action 成功或失敗
   runUftTestsFromFileSystem:
@@ -107,5 +104,3 @@ jobs:
           }
 
           Write-Host "All UFT tests PASSED (no 'Failed' found in results XML)."
-
-
