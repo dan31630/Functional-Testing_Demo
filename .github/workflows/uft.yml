@@ -67,18 +67,24 @@ jobs:
               # 取資料夾名稱 (Demo / Demo_Login)
               $testFolder = Split-Path -Leaf $testPath
 
-              # 報告路徑（目前只做為識別用，實際生成位置交給 FTToolsLauncher）
+              # 報告路徑：C:\UFT_Tests\Reports\子系統\時間序號\腳本名稱
               $resultDir = "C:\UFT_Tests\Reports\$subsystem\$runId\$testFolder"
-              Write-Host "Logical result directory (for logging only): $resultDir"
+              New-Item -ItemType Directory -Path $resultDir -Force | Out-Null
+              Write-Host "Report base directory: $resultDir"
+
+              # 結果檔名（不要含路徑）
+              $resultsName = "${testFolder}_${subsystem}_${runId}"
 
               # properties 檔名（避免特殊字元）
               $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
               $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
 
-              # 產生 properties 檔（只指定 runType + Test1，讓 FTToolsLauncher 自己決定結果路徑）
+              # 產生 properties 檔：指定 runType + Test1 + resultsFilename + fsReportPath
               $propsLines = @(
                 "runType=FileSystem"
                 "Test1=$testPath"
+                "resultsFilename=$resultsName"
+                "fsReportPath=$resultDir"
               )
               $propsLines | Out-File -FilePath $propsFile -Encoding utf8
 
