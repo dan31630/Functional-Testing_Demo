@@ -69,7 +69,7 @@ jobs:
               # ----- 報告根目錄：C:\UFT_Tests\Reports\子系統\時間序號 -----
               $reportRoot = "C:\UFT_Tests\Reports\$subsystem\$runId"
               New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
-              Write-Host "Report root for $subsystem / $testFolder: $reportRoot"
+              Write-Host ("Report root for {0} / {1}: {2}" -f $subsystem, $testFolder, $reportRoot)
 
               # resultsFilename：只用腳本名稱，讓 UFT 產 Demo_1 / Demo_Login_1 資料夾
               $resultsName = $testFolder
