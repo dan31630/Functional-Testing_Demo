@@ -38,7 +38,7 @@ jobs:
           $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
           $map = ConvertFrom-Json $mapJson
 
-          # ===== 這次執行的時間序號（整個 workflow 共用一個）=====
+          # ===== 這次執行的時間序號（只用在「目標路徑」）=====
           $runId = Get-Date -Format 'yyyyMMddHHmmss'
 
           # ===== 腳本路徑對照表 =====
@@ -105,27 +105,23 @@ jobs:
               }
 
               # ===== 從 workspace 找出這次產生的 report，複製到 resultDir =====
-              # FTToolsLauncher 會建立類似：
-              #   UFT_TestsReportsSubsystemA20251203140325Demo
-              # 這種目錄在 workspace 之下
-              $pattern = "UFT_TestsReports${subsystem}${runId}${testFolder}"
+              # 真實的資料夾名稱類似：UFT_TestsReportsSubsystemB20251203142816Demo_Login
+              # 中間那串時間不固定，所以 pattern 改成 * 來模糊比對
+              $pattern = "UFT_TestsReports${subsystem}*${testFolder}"
               Write-Host "Searching report folder with pattern: $pattern under $workspace"
 
               $reportBase = Get-ChildItem -Path $workspace -Directory -Recurse `
-                             | Where-Object { $_.Name -like "$pattern*" } `
+                             | Where-Object { $_.Name -like $pattern } `
                              | Sort-Object LastWriteTime -Descending `
                              | Select-Object -First 1
 
               if ($null -ne $reportBase) {
                 Write-Host "Found report folder: $($reportBase.FullName)"
-                # 有些情況下真正的 test 報告在其子資料夾 (例如 Demo_1)
-                # 我們就整個樹複製到目標 resultDir 底下
                 Copy-Item -Path $reportBase.FullName -Destination $resultDir -Recurse -Force
                 Write-Host "Copied report to: $resultDir"
               }
               else {
                 Write-Host "No report folder matching pattern [$pattern] found under [$workspace]."
-                # 報告找不到不影響是否繼續跑下一個 subsystem/script
               }
             }
           }
