@@ -89,13 +89,14 @@ jobs:
               $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
               $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
 
-              # generate properties file
-              @"
-runType=FileSystem
-Test1=$testPath
-resultsFilename=$resultDir\Results.xml
-fsReportPath=$resultDir
-"@ | Out-File -FilePath $propsFile -Encoding utf8
+              # generate properties file（改掉 here-string，用陣列組字串）
+              $propsLines = @(
+                "runType=FileSystem"
+                "Test1=$testPath"
+                "resultsFilename=$resultDir\Results.xml"
+                "fsReportPath=$resultDir"
+              )
+              $propsLines | Out-File -FilePath $propsFile -Encoding utf8
 
               Write-Host "Created properties file: $propsFile"
 
