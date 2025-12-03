@@ -1,27 +1,28 @@
 name: Run UFT One Tests Action
 
-# 什麼時候觸發：這裡先用手動觸發（UI / API）
 on:
   workflow_dispatch:
 
-# 環境變數（檔名 & 下載 URL）
 env:
-  PROPS_TXT: PropsMultiTests.txt
-  RES_XML: ResultsMultiTests.xml
   LAUNCHER_EXE: FTToolsLauncher.exe
   LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
 
-# 預設用 PowerShell 7，工作目錄為「repo 根目錄」
+  # 子系統 → 指定要跑哪些腳本
+  # Demo = C:\UFT_Tests\Script\Demo
+  # Demo_Login = C:\UFT_Tests\Script\Demo_Login
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
+
 defaults:
   run:
     shell: pwsh
     working-directory: .\
 
 jobs:
-  # 1️⃣ 取得目前 repo（checkout 到 runner 上）
-  getUftTests:
+  runUftTests:
     runs-on: self-hosted
+
     steps:
+      # 1. Checkout repo
       - name: Display the working directory
         run: echo "$pwd"
 
@@ -31,28 +32,7 @@ jobs:
           ref: ${{ github.ref_name }}
           clean: false
 
-  # 2️⃣ 建立 FTToolsLauncher 的 properties 檔（FTTools 需要的設定檔）
-  createPropsFile:
-    runs-on: self-hosted
-    needs: getUftTests
-    steps:
-      - name: Create properties file
-        run: |
-          @"
-          runType=FileSystem
-          Test1=C:\\UFT_Tests\\Script\\Demo
-          resultsFilename=C:\\UFT_Tests\\Reports\\$($env:RES_XML)
-          fsReportPath=C:\\UFT_Tests\\Reports
-          "@ | Out-File -FilePath $env:PROPS_TXT -Encoding utf8
-
-      - name: Check properties file
-        run: Test-Path $env:PROPS_TXT
-
-  # 3️⃣ 準備 FTToolsLauncher.exe（若本機沒有就下載）
-  getFTToolsLauncher:
-    runs-on: self-hosted
-    needs: getUftTests
-    steps:
+      # 2. Download FTToolsLauncher if missing
       - name: GET FTToolsLauncher.exe
         run: |
           if (Test-Path $env:LAUNCHER_EXE) {
@@ -63,44 +43,98 @@ jobs:
             Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
           }
 
-  # 4️⃣ 用 FTToolsLauncher 執行 UFT 測試，並根據結果決定 Action 成功或失敗
-  runUftTestsFromFileSystem:
-    runs-on: self-hosted
-    needs: [getUftTests, createPropsFile, getFTToolsLauncher]
-    steps:
-      - name: Run FT tool and evaluate result
+      # 3. Run tests based on subsystem → script mapping
+      - name: Run UFT tests based on subsystem mapping
         run: |
-          # 1. 執行 FTToolsLauncher
-          $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
-                             -ArgumentList "-paramfile $env:PROPS_TXT" `
-                             -Wait -PassThru -NoNewWindow
+          # ===== parse JSON mapping =====
+          $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
+          $map = ConvertFrom-Json $mapJson
 
-          $code = $p.ExitCode
-          Write-Host "Launcher exit code: $code"
+          # ===== this run's timestamp =====
+          $runId = Get-Date -Format 'yyyyMMddHHmmss'
 
-          # 2. 如果 Launcher 本身就失敗，直接讓 GitHub Action 失敗
-          if ($code -ne 0) {
-            Write-Error "FTToolsLauncher failed with exit code $code"
-            exit $code
+          # ===== define script path lookup table =====
+          $scriptPaths = @{
+            "Demo"       = "C:\UFT_Tests\Script\Demo"
+            "Demo_Login" = "C:\UFT_Tests\Script\Demo_Login"
           }
 
-          # 3. 檢查結果檔是否存在
-          $resultsPath = "C:\UFT_Tests\Reports\$env:RES_XML"
-          if (!(Test-Path $resultsPath)) {
-            Write-Error "Results file not found: $resultsPath"
+          $overallFailed = $false
+
+          foreach ($subsystem in $map.PSObject.Properties.Name) {
+            Write-Host "============================================="
+            Write-Host "   Running scripts for subsystem: $subsystem"
+            Write-Host "============================================="
+
+            $scripts = $map.$subsystem
+
+            foreach ($scriptName in $scripts) {
+              if (-not $scriptPaths.ContainsKey($scriptName)) {
+                Write-Error "Unknown script name: $scriptName"
+                exit 1
+              }
+
+              $testPath = $scriptPaths[$scriptName]
+
+              # extract actual folder name (Demo / Demo_Login)
+              $testFolder = Split-Path -Leaf $testPath
+
+              # report folder
+              $resultDir = "C:\UFT_Tests\Reports\$subsystem\$runId\$testFolder"
+              New-Item -ItemType Directory -Path $resultDir -Force | Out-Null
+
+              Write-Host "Result directory: $resultDir"
+
+              # properties file name
+              $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
+              $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
+
+              # generate properties file
+              @"
+runType=FileSystem
+Test1=$testPath
+resultsFilename=$resultDir\Results.xml
+fsReportPath=$resultDir
+"@ | Out-File -FilePath $propsFile -Encoding utf8
+
+              Write-Host "Created properties file: $propsFile"
+
+              # run FTToolsLauncher
+              $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
+                                 -ArgumentList "-paramfile $propsFile" `
+                                 -Wait -PassThru -NoNewWindow
+
+              $code = $p.ExitCode
+              Write-Host "FTToolsLauncher exit code for $subsystem / $testFolder: $code"
+
+              if ($code -ne 0) {
+                Write-Error "FTToolsLauncher failed for $subsystem / $testFolder with exit code $code"
+                exit $code
+              }
+
+              # validate result
+              $resultsPath = Join-Path $resultDir "Results.xml"
+              if (!(Test-Path $resultsPath)) {
+                Write-Error "Results file missing: $resultsPath"
+                exit 1
+              }
+
+              [xml]$results = Get-Content $resultsPath
+              $xmlText = $results.OuterXml
+
+              if ($xmlText -match 'Failed') {
+                Write-Error "UFT test FAILED for $subsystem / $testFolder"
+                $overallFailed = $true
+              }
+              else {
+                Write-Host "UFT test PASSED for $subsystem / $testFolder"
+              }
+            }
+          }
+
+          if ($overallFailed) {
+            Write-Error "One or more tests FAILED."
             exit 1
           }
 
-          Write-Host "Results file found at $resultsPath"
-
-          # 4. 讀取結果 XML，判斷是否有 Failed
-          [xml]$results = Get-Content $resultsPath
-
-          # 這裡用很保守的方式：只要 XML 內容出現 'Failed' 字樣，就當作有失敗
-          $xmlText = $results.OuterXml
-          if ($xmlText -match 'Failed') {
-            Write-Error "One or more UFT tests FAILED (found 'Failed' in results XML)."
-            exit 1
-          }
-
-          Write-Host "All UFT tests PASSED (no 'Failed' found in results XML)."
+          Write-Host "All assigned UFT tests PASSED."
