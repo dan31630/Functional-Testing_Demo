@@ -1,0 +1,129 @@
+name: Run UFT One Tests Action
+
+on:
+  workflow_dispatch:
+
+env:
+  # FTToolsLauncher 設定
+  LAUNCHER_EXE: FTToolsLauncher.exe
+  LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
+
+  # 子系統 → 要跑哪些腳本
+  # Demo       = C:\UFT_Tests\Script\Demo
+  # Demo_Login = C:\UFT_Tests\Script\Demo_Login
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
+
+jobs:
+  runUftTests:
+    runs-on: self-hosted
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: .
+
+    steps:
+      - name: Run UFT tests based on subsystem mapping
+        run: |
+          # ===== 下載 FTToolsLauncher（若尚未存在）=====
+          if (-not (Test-Path $env:LAUNCHER_EXE)) {
+            Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
+            Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
+          }
+          else {
+            Write-Host "FTToolsLauncher.exe already exists"
+          }
+
+          # ===== 解析 JSON mapping =====
+          $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
+          $map = ConvertFrom-Json $mapJson
+
+          # ===== 這次執行的時間序號（整個 workflow 共用一個）=====
+          $runId = Get-Date -Format 'yyyyMMddHHmmss'
+
+          # ===== 腳本路徑對照表 =====
+          $scriptPaths = @{
+            "Demo"       = "C:\\UFT_Tests\\Script\\Demo"
+            "Demo_Login" = "C:\\UFT_Tests\\Script\\Demo_Login"
+          }
+
+          $overallFailed = $false
+
+          foreach ($subsystem in $map.PSObject.Properties.Name) {
+            Write-Host "============================================="
+            Write-Host "   Running scripts for subsystem: $subsystem"
+            Write-Host "============================================="
+
+            $scripts = $map.$subsystem
+
+            foreach ($scriptName in $scripts) {
+              if (-not $scriptPaths.ContainsKey($scriptName)) {
+                Write-Host "Unknown script name: $scriptName"
+                $overallFailed = $true
+                continue
+              }
+
+              $testPath   = $scriptPaths[$scriptName]
+              $testFolder = Split-Path -Leaf $testPath    # Demo / Demo_Login
+
+              # ----- 報告根目錄：C:\UFT_Tests\Reports\子系統\時間序號 -----
+              $reportRoot = "C:\UFT_Tests\Reports\$subsystem\$runId"
+              New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
+              Write-Host "Report root for $subsystem / $testFolder: $reportRoot"
+
+              # resultsFilename：只用腳本名稱，讓 UFT 產 Demo_1 / Demo_Login_1 資料夾
+              $resultsName = $testFolder
+
+              # properties 檔名（避免特殊字元）
+              $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
+              $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
+
+              # 產生 properties 檔：指定 runType + Test1 + fsReportPath + resultsFilename
+              $propsLines = @(
+                "runType=FileSystem"
+                "Test1=$testPath"
+                "fsReportPath=$reportRoot"
+                "resultsFilename=$resultsName"
+              )
+              $propsLines | Out-File -FilePath $propsFile -Encoding utf8
+
+              Write-Host "Created properties file: $propsFile"
+              Get-Content $propsFile
+
+              # ===== 執行 FTToolsLauncher =====
+              $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
+                                 -ArgumentList "-paramfile $propsFile" `
+                                 -Wait -PassThru -NoNewWindow
+
+              $code = $p.ExitCode
+              Write-Host "FTToolsLauncher exit code for $subsystem / $testFolder : $code"
+
+              if ($code -ne 0) {
+                Write-Host "UFT test FAILED for $subsystem / $testFolder (exit code $code)."
+                $overallFailed = $true
+              }
+              else {
+                Write-Host "UFT test PASSED for $subsystem / $testFolder (exit code 0)."
+              }
+
+              # ----- 確認報告資料夾是否產出 -----
+              $expectedReportDirPattern = Join-Path $reportRoot ($resultsName + "_*")
+              $reportDirs = Get-ChildItem -Path $expectedReportDirPattern -Directory -ErrorAction SilentlyContinue
+
+              if ($reportDirs) {
+                $reportDirs | ForEach-Object {
+                  Write-Host "Report directory exists: $($_.FullName)"
+                }
+              }
+              else {
+                Write-Host "No report directory found under $reportRoot matching $($resultsName + '_*')"
+              }
+            }
+          }
+
+          if ($overallFailed) {
+            Write-Error "One or more UFT tests FAILED."
+            exit 1
+          }
+
+          Write-Host "All assigned UFT tests PASSED."
