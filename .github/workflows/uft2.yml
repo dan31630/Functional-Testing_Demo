@@ -67,7 +67,7 @@ jobs:
               $testFolder = Split-Path -Leaf $testPath    # Demo / Demo_Login
 
               # ----- 報告根目錄：C:\UFT_Tests\Reports\子系統\時間序號 -----
-              $reportRoot = "C:\UFT_Tests\Reports\$subsystem\$runId"
+              $reportRoot = "C:\\UFT_Tests\\Reports\\$subsystem\\$runId"
               New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
               Write-Host ("Report root for {0} / {1}: {2}" -f $subsystem, $testFolder, $reportRoot)
 
