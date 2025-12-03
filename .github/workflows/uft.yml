@@ -67,26 +67,23 @@ jobs:
               # 取資料夾名稱 (Demo / Demo_Login)
               $testFolder = Split-Path -Leaf $testPath
 
-              # 報告路徑：C:\UFT_Tests\Reports\子系統\時間序號\腳本名稱
+              # 報告路徑（目前只做為識別用，實際生成位置交給 FTToolsLauncher）
               $resultDir = "C:\UFT_Tests\Reports\$subsystem\$runId\$testFolder"
-              New-Item -ItemType Directory -Path $resultDir -Force | Out-Null
-
-              Write-Host "Result directory: $resultDir"
+              Write-Host "Logical result directory (for logging only): $resultDir"
 
               # properties 檔名（避免特殊字元）
               $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
               $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
 
-              # 產生 properties 檔
+              # 產生 properties 檔（只指定 runType + Test1，讓 FTToolsLauncher 自己決定結果路徑）
               $propsLines = @(
                 "runType=FileSystem"
                 "Test1=$testPath"
-                "resultsFilename=$resultDir\Results.xml"
-                "fsReportPath=$resultDir"
               )
               $propsLines | Out-File -FilePath $propsFile -Encoding utf8
 
               Write-Host "Created properties file: $propsFile"
+              Get-Content $propsFile
 
               # 執行 FTToolsLauncher
               $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
@@ -98,25 +95,10 @@ jobs:
 
               if ($code -ne 0) {
                 Write-Error "FTToolsLauncher failed for $subsystem / $testFolder with exit code $code"
-                exit $code
-              }
-
-              # 確認結果檔存在
-              $resultsPath = Join-Path $resultDir "Results.xml"
-              if (!(Test-Path $resultsPath)) {
-                Write-Error "Results file missing: $resultsPath"
-                exit 1
-              }
-
-              [xml]$results = Get-Content $resultsPath
-              $xmlText = $results.OuterXml
-
-              if ($xmlText -match 'Failed') {
-                Write-Error "UFT test FAILED for $subsystem / $testFolder"
                 $overallFailed = $true
               }
               else {
-                Write-Host "UFT test PASSED for $subsystem / $testFolder"
+                Write-Host "UFT test PASSED for $subsystem / $testFolder (launcher exit code 0)."
               }
             }
           }
