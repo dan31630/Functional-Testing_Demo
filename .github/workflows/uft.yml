@@ -3,17 +3,45 @@ name: Run UFT One Tests Action
 on:
   workflow_dispatch:
 
-      
+env:
+  # FTToolsLauncher 設定
+  LAUNCHER_EXE: FTToolsLauncher.exe
+  LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
+
+  # 子系統 → 要跑哪些腳本
+  # Demo       = C:\UFT_Tests\Script\Demo
+  # Demo_Login = C:\UFT_Tests\Script\Demo_Login
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
+
+jobs:
+  runUftTests:
+    runs-on: self-hosted
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: .
+
+    steps:
       - name: Run UFT tests based on subsystem mapping
         run: |
-          # ===== parse JSON mapping =====
+          # ===== 下載 FTToolsLauncher（若尚未存在）=====
+          if (-not (Test-Path $env:LAUNCHER_EXE)) {
+            Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
+            Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
+          }
+          else {
+            Write-Host "FTToolsLauncher.exe already exists"
+          }
+
+          # ===== 解析 JSON mapping =====
           $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
           $map = ConvertFrom-Json $mapJson
 
-          # ===== this run's timestamp =====
+          # ===== 這次執行的時間序號 =====
           $runId = Get-Date -Format 'yyyyMMddHHmmss'
 
-          # ===== define script path lookup table =====
+          # ===== 腳本路徑對照表 =====
           $scriptPaths = @{
             "Demo"       = "C:\UFT_Tests\Script\Demo"
             "Demo_Login" = "C:\UFT_Tests\Script\Demo_Login"
@@ -36,20 +64,20 @@ on:
 
               $testPath = $scriptPaths[$scriptName]
 
-              # extract actual folder name (Demo / Demo_Login)
+              # 取資料夾名稱 (Demo / Demo_Login)
               $testFolder = Split-Path -Leaf $testPath
 
-              # report folder
+              # 報告路徑：C:\UFT_Tests\Reports\子系統\時間序號\腳本名稱
               $resultDir = "C:\UFT_Tests\Reports\$subsystem\$runId\$testFolder"
               New-Item -ItemType Directory -Path $resultDir -Force | Out-Null
 
               Write-Host "Result directory: $resultDir"
 
-              # properties file name
+              # properties 檔名（避免特殊字元）
               $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
               $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
 
-              # generate properties file（改掉 here-string，用陣列組字串）
+              # 產生 properties 檔
               $propsLines = @(
                 "runType=FileSystem"
                 "Test1=$testPath"
@@ -60,7 +88,7 @@ on:
 
               Write-Host "Created properties file: $propsFile"
 
-              # run FTToolsLauncher
+              # 執行 FTToolsLauncher
               $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
                                  -ArgumentList "-paramfile $propsFile" `
                                  -Wait -PassThru -NoNewWindow
@@ -73,7 +101,7 @@ on:
                 exit $code
               }
 
-              # validate result
+              # 確認結果檔存在
               $resultsPath = Join-Path $resultDir "Results.xml"
               if (!(Test-Path $resultsPath)) {
                 Write-Error "Results file missing: $resultsPath"
