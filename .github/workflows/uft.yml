@@ -1,49 +1,3 @@
-name: Run UFT One Tests Action
-
-on:
-  workflow_dispatch:
-
-env:
-  LAUNCHER_EXE: FTToolsLauncher.exe
-  LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
-
-  # 子系統 → 指定要跑哪些腳本
-  # Demo = C:\UFT_Tests\Script\Demo
-  # Demo_Login = C:\UFT_Tests\Script\Demo_Login
-  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
-
-defaults:
-  run:
-    shell: pwsh
-    working-directory: .\
-
-jobs:
-  runUftTests:
-    runs-on: self-hosted
-
-    steps:
-      # 1. Checkout repo
-      - name: Display the working directory
-        run: echo "$pwd"
-
-      - name: Checkout current repo
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.ref_name }}
-          clean: false
-
-      # 2. Download FTToolsLauncher if missing
-      - name: GET FTToolsLauncher.exe
-        run: |
-          if (Test-Path $env:LAUNCHER_EXE) {
-            Write-Host "FTToolsLauncher.exe already exists"
-          }
-          else {
-            Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
-            Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
-          }
-
-      # 3. Run tests based on subsystem → script mapping
       - name: Run UFT tests based on subsystem mapping
         run: |
           # ===== parse JSON mapping =====
@@ -106,7 +60,7 @@ jobs:
                                  -Wait -PassThru -NoNewWindow
 
               $code = $p.ExitCode
-              Write-Host "FTToolsLauncher exit code for $subsystem / $testFolder: $code"
+              Write-Host "FTToolsLauncher exit code for $subsystem / $testFolder : $code"
 
               if ($code -ne 0) {
                 Write-Error "FTToolsLauncher failed for $subsystem / $testFolder with exit code $code"
