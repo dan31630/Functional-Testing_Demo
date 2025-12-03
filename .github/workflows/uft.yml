@@ -1,3 +1,9 @@
+name: Run UFT One Tests Action
+
+on:
+  workflow_dispatch:
+
+      
       - name: Run UFT tests based on subsystem mapping
         run: |
           # ===== parse JSON mapping =====
