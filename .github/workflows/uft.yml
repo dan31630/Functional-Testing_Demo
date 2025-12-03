@@ -38,7 +38,7 @@ jobs:
           $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
           $map = ConvertFrom-Json $mapJson
 
-          # ===== 這次執行的時間序號 =====
+          # ===== 這次執行的時間序號（整個 workflow 共用一個）=====
           $runId = Get-Date -Format 'yyyyMMddHHmmss'
 
           # ===== 腳本路徑對照表 =====
@@ -48,6 +48,7 @@ jobs:
           }
 
           $overallFailed = $false
+          $workspace = $env:GITHUB_WORKSPACE
 
           foreach ($subsystem in $map.PSObject.Properties.Name) {
             Write-Host "============================================="
@@ -58,8 +59,9 @@ jobs:
 
             foreach ($scriptName in $scripts) {
               if (-not $scriptPaths.ContainsKey($scriptName)) {
-                Write-Error "Unknown script name: $scriptName"
-                exit 1
+                Write-Host "Unknown script name: $scriptName"
+                $overallFailed = $true
+                continue
               }
 
               $testPath = $scriptPaths[$scriptName]
@@ -67,31 +69,26 @@ jobs:
               # 取資料夾名稱 (Demo / Demo_Login)
               $testFolder = Split-Path -Leaf $testPath
 
-              # 報告路徑：C:\UFT_Tests\Reports\子系統\時間序號\腳本名稱
+              # 目標報告路徑：C:\UFT_Tests\Reports\子系統\時間序號\腳本名稱
               $resultDir = "C:\UFT_Tests\Reports\$subsystem\$runId\$testFolder"
               New-Item -ItemType Directory -Path $resultDir -Force | Out-Null
-              Write-Host "Report base directory: $resultDir"
-
-              # 結果檔名（不要含路徑）
-              $resultsName = "${testFolder}_${subsystem}_${runId}"
+              Write-Host "Target report directory: $resultDir"
 
               # properties 檔名（避免特殊字元）
               $safeSubsystem = $subsystem -replace '[\\/:*?"<>|]', '_'
               $propsFile = "Props_${safeSubsystem}_$testFolder.txt"
 
-              # 產生 properties 檔：指定 runType + Test1 + resultsFilename + fsReportPath
+              # 只指定 runType + Test1，讓 FTToolsLauncher 自己決定報告實際路徑
               $propsLines = @(
                 "runType=FileSystem"
                 "Test1=$testPath"
-                "resultsFilename=$resultsName"
-                "fsReportPath=$resultDir"
               )
               $propsLines | Out-File -FilePath $propsFile -Encoding utf8
 
               Write-Host "Created properties file: $propsFile"
               Get-Content $propsFile
 
-              # 執行 FTToolsLauncher
+              # ===== 執行 FTToolsLauncher =====
               $p = Start-Process -FilePath "$env:LAUNCHER_EXE" `
                                  -ArgumentList "-paramfile $propsFile" `
                                  -Wait -PassThru -NoNewWindow
@@ -100,17 +97,41 @@ jobs:
               Write-Host "FTToolsLauncher exit code for $subsystem / $testFolder : $code"
 
               if ($code -ne 0) {
-                Write-Error "FTToolsLauncher failed for $subsystem / $testFolder with exit code $code"
+                Write-Host "UFT test FAILED for $subsystem / $testFolder (exit code $code)."
                 $overallFailed = $true
               }
               else {
-                Write-Host "UFT test PASSED for $subsystem / $testFolder (launcher exit code 0)."
+                Write-Host "UFT test PASSED for $subsystem / $testFolder (exit code 0)."
+              }
+
+              # ===== 從 workspace 找出這次產生的 report，複製到 resultDir =====
+              # FTToolsLauncher 會建立類似：
+              #   UFT_TestsReportsSubsystemA20251203140325Demo
+              # 這種目錄在 workspace 之下
+              $pattern = "UFT_TestsReports${subsystem}${runId}${testFolder}"
+              Write-Host "Searching report folder with pattern: $pattern under $workspace"
+
+              $reportBase = Get-ChildItem -Path $workspace -Directory -Recurse `
+                             | Where-Object { $_.Name -like "$pattern*" } `
+                             | Sort-Object LastWriteTime -Descending `
+                             | Select-Object -First 1
+
+              if ($null -ne $reportBase) {
+                Write-Host "Found report folder: $($reportBase.FullName)"
+                # 有些情況下真正的 test 報告在其子資料夾 (例如 Demo_1)
+                # 我們就整個樹複製到目標 resultDir 底下
+                Copy-Item -Path $reportBase.FullName -Destination $resultDir -Recurse -Force
+                Write-Host "Copied report to: $resultDir"
+              }
+              else {
+                Write-Host "No report folder matching pattern [$pattern] found under [$workspace]."
+                # 報告找不到不影響是否繼續跑下一個 subsystem/script
               }
             }
           }
 
           if ($overallFailed) {
-            Write-Error "One or more tests FAILED."
+            Write-Error "One or more UFT tests FAILED."
             exit 1
           }
 
