@@ -43,8 +43,8 @@ jobs:
 
           # ===== 腳本路徑對照表 =====
           $scriptPaths = @{
-            "Demo"       = "C:\UFT_Tests\Script\Demo"
-            "Demo_Login" = "C:\UFT_Tests\Script\Demo_Login"
+            "Demo"       = "C:\\UFT_Tests\\Script\\Demo"
+            "Demo_Login" = "C:\\UFT_Tests\\Script\\Demo_Login"
           }
 
           $overallFailed = $false
