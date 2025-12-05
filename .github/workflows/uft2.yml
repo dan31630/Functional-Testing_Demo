@@ -11,7 +11,7 @@ env:
   # 子系統 → 要跑哪些腳本
   # Demo       = C:\UFT_Tests\Script\Demo
   # Demo_Login = C:\UFT_Tests\Script\Demo_Login
-  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo","Demo_Login"]}'
 
 jobs:
   runUftTests:
