@@ -127,12 +127,10 @@ jobs:
           }
 
           Write-Host "All assigned UFT tests PASSED."
-
-	      # ============================================================
-          # 新增區塊 1：執行批次檔（例如：掛載網路磁碟 / 開啟 VPN）
           # ============================================================
-
-          $batchFile = "C:\\Scripts\\MountShare.bat"   # 更換成批次檔路徑
+          # 新增區塊 1：執行批次檔
+          # ============================================================
+          $batchFile = "C:\\Scripts\\MountShare.bat"  # 更換成批次檔路徑
 
           if (Test-Path $batchFile) {
             Write-Host "Running post-processing batch file: $batchFile"
