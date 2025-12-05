@@ -132,7 +132,7 @@ jobs:
           # 新增區塊 1：執行批次檔（例如：掛載網路磁碟 / 開啟 VPN）
           # ============================================================
 
-          $batchFile = "C:\\Scripts\\MountShare.bat"   # <== 換成你自己的批次檔路徑
+          $batchFile = "C:\\Scripts\\MountShare.bat"   # 更換成批次檔路徑
 
           if (Test-Path $batchFile) {
             Write-Host "Running post-processing batch file: $batchFile"
@@ -151,14 +151,12 @@ jobs:
           # ============================================================
 
           # 本機報告根目錄
-          $localReportRoot  = "C:\\UFT_Tests\\Reports"
+          $localReportRoot  = "C:\\UFT_Tests\\Reports" #report存放的路徑
 
-          # 目標路徑（可以是網路磁碟機，例如：Z:\UFT_Reports\）
-          # 若批次檔內是 map Z:，這裡就用 Z:\...
-          $remoteReportRoot = "Z:\\UFT_Reports"   # <== 換成你要放的路徑
+          # 搬移到的網路磁碟機路徑
+          $remoteReportRoot = "Z:\\UFT_Reports"   # 網路磁碟機要存放路徑
 
-          # 依每個 subsystem，把 C:\UFT_Tests\Reports\<Subsystem>\<runId>\*
-          # 搬到 Z:\UFT_Reports\<Subsystem>\<runId>\ 底下
+          # 依執行結果，把 C:\UFT_Tests\Reports\<Subsystem>\<runId>\* ，搬到 Z:\UFT_Reports\<Subsystem>\<runId>\ 底下
           foreach ($subsystem in $map.PSObject.Properties.Name) {
             $srcFolder = Join-Path $localReportRoot "$subsystem\\$runId"
             if (-not (Test-Path $srcFolder)) {
