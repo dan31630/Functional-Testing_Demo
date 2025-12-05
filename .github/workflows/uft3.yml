@@ -9,9 +9,8 @@ env:
   LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
 
   # SubsystemA → 定義儲存的子系統名稱
-  # Demo       = C:\UFT_Tests\Script\Demo
-  # Demo_Login = C:\UFT_Tests\Script\Demo_Login
-  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"],"SubsystemB":["Demo_Login"]}'
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo","Demo_Login"]}'
+
 
 jobs:
   runUftTests:
