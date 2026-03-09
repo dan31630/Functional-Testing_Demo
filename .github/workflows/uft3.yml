@@ -134,28 +134,28 @@ jobs:
           }
 
           # ============================================================
-          # 新增2：搬移（或複製）這次 runId 的所有報告到指定路徑
+          # 新增2：搬移（或複製）這次 runId 的所有報告到指定路徑 (待確認)
           # ============================================================
 
           # 本機報告根目錄
           $localReportRoot  = "C:\\UFT_Tests\\Reports" #report存放的路徑
 
-          # 搬移到的網路磁碟機路徑
-          $remoteReportRoot = "Z:\\UFT_Reports"   # 網路磁碟機要存放路徑
+          # 搬移到的網路磁碟機路徑(要確認搬移到哪裡)
+          #$remoteReportRoot = "Z:\\UFT_Reports"   # 網路磁碟機要存放路徑
 
           # 依執行結果，把 C:\UFT_Tests\Reports\<Subsystem>\<runId>\* ，搬到 Z:\UFT_Reports\<Subsystem>\<runId>\ 底下
-          foreach ($subsystem in $map.PSObject.Properties.Name) {
-            $srcFolder = Join-Path $localReportRoot "$subsystem\\$runId"
-            if (-not (Test-Path $srcFolder)) {
-              Write-Warning "Source run folder not found for $subsystem : $srcFolder"
-              continue
-            }
+          #foreach ($subsystem in $map.PSObject.Properties.Name) {
+          # $srcFolder = Join-Path $localReportRoot "$subsystem\\$runId"
+          #  if (-not (Test-Path $srcFolder)) {
+          #    Write-Warning "Source run folder not found for $subsystem : $srcFolder"
+          #    continue
+          #  }
 
-            $destFolder = Join-Path $remoteReportRoot "$subsystem\\$runId"
-            New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
+          #  $destFolder = Join-Path $remoteReportRoot "$subsystem\\$runId"
+          #  New-Item -ItemType Directory -Path $destFolder -Force | Out-Null
 
-            Write-Host "Copying reports for $subsystem from $srcFolder to $destFolder ..."
-            Copy-Item -Path (Join-Path $srcFolder "*") -Destination $destFolder -Recurse -Force
+          #  Write-Host "Copying reports for $subsystem from $srcFolder to $destFolder ..."
+          #  Copy-Item -Path (Join-Path $srcFolder "*") -Destination $destFolder -Recurse -Force
 
-            Write-Host "Done copying reports for $subsystem."
-          }
+          #  Write-Host "Done copying reports for $subsystem."
+          #}
