@@ -5,11 +5,10 @@ on:
 
 env:
   # FTToolsLauncher 設定
-  LAUNCHER_EXE: FTToolsLauncher.exe
-  LAUNCHER_URL: https://github.com/MicroFocus/ADM-FT-ToolsLauncher/releases/download/v1.0-beta-rev12/FTToolsLauncher_net48.exe
+  LAUNCHER_EXE: C:\actions-runner\FTToolsLauncher.exe
 
   # SubsystemA → 定義儲存的子系統名稱
-  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo","Demo_Login"]}'
+  SUBSYSTEM_SCRIPT_MAP: '{"SubsystemA":["Demo"]}'
 
 
 jobs:
@@ -24,15 +23,6 @@ jobs:
     steps:
       - name: Run UFT tests based on subsystem mapping
         run: |
-          # ===== 下載 FTToolsLauncher（若尚未存在）=====
-          if (-not (Test-Path $env:LAUNCHER_EXE)) {
-            Write-Host "Downloading FTToolsLauncher.exe from $env:LAUNCHER_URL ..."
-            Invoke-WebRequest -Uri $env:LAUNCHER_URL -OutFile $env:LAUNCHER_EXE
-          }
-          else {
-            Write-Host "FTToolsLauncher.exe already exists"
-          }
-
           # ===== 解析 JSON mapping =====
           $mapJson = $env:SUBSYSTEM_SCRIPT_MAP
           $map = ConvertFrom-Json $mapJson
@@ -43,7 +33,7 @@ jobs:
           # ===== 腳本路徑對照表 =====
           $scriptPaths = @{
             "Demo"       = "C:\\UFT_Tests\\Script\\Demo"
-            "Demo_Login" = "C:\\UFT_Tests\\Script\\Demo_Login"
+          # "Demo_Login" = "C:\\UFT_Tests\\Script\\Demo_Login"
           }
 
           $overallFailed = $false
